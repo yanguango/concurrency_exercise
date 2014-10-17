@@ -7,24 +7,35 @@
 #include "cart.h"
 #include "monitor.h"
 
-pthread_t n_thread;
-pthread_t w_thread;
-pthread_t s_thread;
-pthread_t e_thread;
-pthread_mutex_t monitor;
-pthread_cond_t activeN;
-pthread_cond_t activeW;
-pthread_cond_t activeS;
-pthread_cond_t activeE;
+static pthread_t n_thread;
+static pthread_t w_thread;
+static pthread_t s_thread;
+static pthread_t e_thread;
 
-char activeDir;
-char *dirs;
+static pthread_mutex_t monitor;
 
+/* four condition variable for each direction */
+static pthread_cond_t activeN;
+static pthread_cond_t activeW;
+static pthread_cond_t activeS;
+static pthread_cond_t activeE;
+
+static pthread_barrier_t barrier;
+
+/* indicate next active direction */
+char activeDir; 
+
+/* a directions string for obtaining next direction
+ * follow the counterclock order */
+char *dirs; 
+
+/* get next direction */
 char next_dir(char dir) {
     int pos = (int)(strchr(dirs, dir) - dirs);
     return dirs[(pos + 1) % strlen(dirs)];
 }
 
+/* delete one direction when carts in the direction all entered */
 void del_dir(char dir) {
     int i;
     for(i = 0; i < strlen(dirs); i++ )
@@ -32,6 +43,7 @@ void del_dir(char dir) {
             strcpy( dirs + i, dirs + i + 1 );
 }
 
+/* get the condition variable accoring to the direction */
 pthread_cond_t *dir_cond(char dir) {
     pthread_cond_t *cond;
     switch(dir) {
@@ -51,6 +63,7 @@ pthread_cond_t *dir_cond(char dir) {
     return cond;
 }
 
+/* main procedure of traffic thread in four directions */
 void *traffic(void *params) {
     char dir = *((char *)params);
     char nextDir;
@@ -86,33 +99,51 @@ void *traffic(void *params) {
         
         cart = q_getCart(dir);
     }
+    
+    /* flag all carts in the queue have entered */
+    q_cartHasEntered(dir);
+    /* delete current direction in dirs */
     del_dir(dir);
+    
+    pthread_barrier_wait(&barrier);
+    
     fprintf(stderr, "Thread for direction %c exits\n", dir);
     return (void *)NULL;
 }
 
 int main(int argc, char **argv) {
     int i;
-    char *cartstring;
     char dirN = Q_NORTH;
     char dirS = Q_SOUTH;
     char dirW = Q_WEST;
     char dirE = Q_EAST;
+    
+    /* initialize dirs with nwse, counterclock order */    
     dirs = calloc(5, sizeof(char));
     strcpy(dirs, "nwse");
     
+
     if (argc < 2) {
         printf("usage: ./trafficmgr <cart string>\n");
     } else {
-        cartstring = argv[1];
-        for (i = 0; i < strlen(cartstring); i++){
-            q_putCart(cartstring[i]);
-        }
-                
+        /* read carts into queues of four directions */
+        for (i = 0; i < strlen(argv[1]); i++){
+            q_putCart(argv[1][i]);
+        } 
     }
+    
+    pthread_barrier_init(&barrier, NULL, 4);
 
+    /* print queues in each direction before traffic */
+    q_print(dirN);
+    q_print(dirS);
+    q_print(dirW);
+    q_print(dirE);
+    
+    /* set the first active direction, it can be set to anyone direction */
     activeDir = Q_EAST;
         
+    /* create threads for every direction */
     if (pthread_create(&n_thread, NULL, traffic, (void *)&dirN) != 0)
         perror("pthread_create"), exit(1);
     if (pthread_create(&w_thread, NULL, traffic, (void *)&dirW) != 0)
@@ -121,7 +152,7 @@ int main(int argc, char **argv) {
         perror("pthread_create"), exit(1);
     if (pthread_create(&e_thread, NULL, traffic, (void *)&dirE) != 0)
         perror("pthread_create"), exit(1);
-
+    
     if (pthread_join(n_thread, NULL) != 0) {
         perror("pthread_join"), exit(1);
     }
@@ -134,5 +165,12 @@ int main(int argc, char **argv) {
     if (pthread_join(e_thread, NULL) != 0) {
         perror("pthread_join"), exit(1);
     }
-     return 0;
+
+    /* free used resource */
+    q_shutdown();
+    monitor_shutdown();
+    if(pthread_barrier_destroy(&barrier))
+        perror("pthread_barrier_destroy"), exit(1);
+
+    return 0;
 }
