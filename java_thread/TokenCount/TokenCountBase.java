@@ -8,7 +8,7 @@ import java.util.Set;
 import java.util.concurrent.ArrayBlockingQueue;
 
 public class TokenCountBase {
-	protected final int QUEUE_SIZE = 10;
+	protected final int QUEUE_SIZE = 100;
 	protected volatile ArrayBlockingQueue<Page> queue;
 	protected Iterable<Page> allPages;
 	protected boolean producingFinish;
@@ -53,7 +53,7 @@ public class TokenCountBase {
 				e.printStackTrace();
 			}
 		}
-		queue.add(pg);
+		queue.offer(pg);
 		notify();
 	}
 

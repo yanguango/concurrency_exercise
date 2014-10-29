@@ -32,8 +32,6 @@ public class TokenCountV4 extends TokenCountBase {
 			} else {
 				tokenFreq.put(key, val);
 			}
-			System.out.println(pairs.getKey() + " = " + pairs.getValue());
-
 		}
 	}
 
@@ -65,7 +63,7 @@ public class TokenCountV4 extends TokenCountBase {
 				Iterable<String> allTokens = new Words(pg.getText());
 
 				for (String s : allTokens) {
-					countToken(s);
+					countToken(s, map);
 				}
 				pg = getPage();
 			}
