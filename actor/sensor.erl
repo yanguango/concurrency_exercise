@@ -1,20 +1,19 @@
 -module(sensor).
 -export([measure/2]).
 
-handle(Watcher, SensorID, 11) ->
-  Watcher ! {'EXIT', SensorID, anomalous_reading },
-  catch exit(anomalous_reading);
+handle(_, Sensor_ID, 11) ->
+  exit({anomalous_reading, Sensor_ID});
 
-handle(Watcher,SensorID,  Measurement) -> 
-  Watcher ! {SensorID, Measurement}.
+handle(Watcher,Sensor_ID,  Measurement) -> 
+  Watcher ! {Sensor_ID, Measurement}.
 
-measure(Watcher, SensorID) ->
+measure(Watcher, Sensor_ID) ->
   random:seed(erlang:now()),
   Measurement = random:uniform(11),
-  handle(Watcher,SensorID,  Measurement),
+  handle(Watcher, Sensor_ID,  Measurement),
   Sleep_time = random:uniform(1000),
   timer:sleep(Sleep_time),
-  measure(Watcher, SensorID).
+  measure(Watcher, Sensor_ID).
   
 
   
